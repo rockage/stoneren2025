@@ -1,0 +1,135 @@
+<div x-data="userData()" x-init="alpineInit()" class="w-full max-w-screen-md mx-auto space-y-6">
+    <!-- 回到顶部按钮 -->
+    <div x-data="{ showTop: false }" x-init="window.addEventListener('scroll', () => { showTop = window.scrollY > 300})"
+        class="fixed bottom-6 right-6 z-50">
+        <button x-show="showTop" x-transition @click="window.scrollTo({ top: 0, behavior: 'smooth' })"
+            class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full shadow-lg text-sm">
+            ⬆ 回到顶部
+        </button>
+    </div>
+
+    <template x-for="thread in threads" :key="thread.tid">
+
+        <div class="w-full bg-white p-4 shadow-md rounded-lg">
+            <div class="flex items-center space-x-3">
+                <img src="public/avatar.png" alt="用户头像" class="w-12 h-12 rounded-full">
+                <div class="flex flex-col">
+                    <span></span>
+                    <span class="font-bold text-gray-700 text-sm text-left cursor-pointer" x-text="thread.author" @click="openDetail(thread.authorid)"> </span>
+                        <span class=" text-sm text-gray-500" x-text="thread.dateline"></span>
+                </div>
+            </div>
+
+            <h2 class="mt-3 text-lg font-bold text-gray-800 text-left cursor-pointer" x-text="thread.subject"
+                @click="goToPost(thread.tid)"></h2>
+            <p class="mt-2 text-[#85878e] text-sm text-left overflow-hidden text-ellipsis" x-text="thread.lastmessage">
+            </p>
+
+            <div class="mt-4 flex justify-between items-center">
+                <button class="flex items-center space-x-1 text-gray-500 hover:text-blue-500">
+                    <span>💬 交流</span>
+                </button>
+                <div class="flex space-x-3">
+                    <button class="text-gray-500 hover:text-red-500">👍</button>
+                    <button class="text-gray-500 hover:text-green-500">💬</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- 加载更多触发器 -->
+    <div x-ref="loadMoreTrigger" class="text-center text-gray-500 p-4">
+        <template x-if="loading">
+            <p>加载中...</p>
+        </template>
+        <template x-if="allLoaded">
+            <p>没有更多数据了</p>
+        </template>
+    </div>
+</div>
+
+<script>
+    function userData() {
+        return {
+            threads: [],
+            page: 1,
+            loading: false,
+            allLoaded: false, // 是否已经加载完所有数据
+            fid: Alpine.store("search").fid,
+            sort: Alpine.store("search").sort,
+            uid: Alpine.store("search").uid,
+            keyword: Alpine.store("search").keyword,
+            // 打开全局弹窗：用户详情
+            openDetail(uid) {
+                Alpine.store("global").uid = uid
+                Alpine.store("global").getUserProfile()
+            },
+            // 获取帖子数据
+            fetchThreads() {
+                if (this.loading || this.allLoaded) return
+                this.loading = true;
+
+                axios.get(`http://192.168.12.113:5050/threads?page=${this.page}&fid=${this.fid}&sort=${this.sort}&uid=${this.uid}&keyword=${this.keyword}`)
+                    .then(response => {
+                        if (response.data.length > 0) {
+                            this.threads.push(...response.data);
+                            this.page++;
+
+                            Alpine.store("bbs").fetchPage = this.page
+                        } else {
+                            this.allLoaded = true; // 没有更多数据
+                        }
+                    })
+                    .catch(error => {
+                        console.error("Axios Error:", error);
+                        this.allLoaded = true
+                    })
+                    .finally(() => {
+                        this.loading = false;
+                    });
+            },
+
+            // 使用 IntersectionObserver 监听 "加载更多" 触发器
+            setupObserver() {
+                let observer = new IntersectionObserver((entries) => {
+                    if (entries[0].isIntersecting) {
+                        this.fetchThreads();
+                    }
+                }, { rootMargin: "100px" });
+
+                observer.observe(this.$refs.loadMoreTrigger);
+            },
+            goToPost(tid) {
+                // 触发全局事件，通知 index.html 需要加载帖子详情
+
+                Alpine.store("bbs").scrollY = window.scrollY
+                Alpine.store("bbs").threads = this.threads
+                Alpine.store("search").fid = this.fid
+                window.dispatchEvent(new CustomEvent("loadPost", { detail: { tid: tid } }));
+            },
+            // 初始化方法
+            alpineInit() {
+
+                this.setupObserver(); // 启动 IntersectionObserver 监听懒加载
+
+                // 检查全局存储的帖子数据
+                if (Alpine.store("bbs").threads.length > 0) {
+
+                    this.threads = Alpine.store("bbs").threads
+
+                    requestAnimationFrame(() => { //告诉浏览器你希望执行一个动画。它要求浏览器在下一次重绘之前，调用用户提供的回调函数。
+                        window.scrollTo(0, Alpine.store("bbs").scrollY)
+                        this.page = Alpine.store("bbs").fetchPage
+                    });
+
+
+
+                } else {
+                    this.fetchThreads(); // 如缓存中没有数据，则通过API请求加载第一页
+                }
+            },
+
+        };
+    }
+
+</script>

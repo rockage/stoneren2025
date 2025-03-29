@@ -1,0 +1,82 @@
+<!-- 用户详情模态框 -->
+<div x-data="userProfile()" x-init="alpineInit()" x-show="show" 
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" >
+  <div class="bg-white p-6 rounded-lg shadow-md w-full max-w-lg relative" @click.away="detail = false">
+    <div class="flex space-x-4">
+      <!-- 头像占位 -->
+      <div class="flex flex-col items-center space-y-2">
+        <!-- 上部信息 -->
+        <div class="text-lg text-gray-500" x-text="selectedUser.username"></div>
+        <div class="text-sm text-gray-500" x-text="'UID: ' + selectedUser.uid"></div>
+        <!-- 头像本体 -->
+        <img src="public/avatar.png" alt="用户头像" class="w-24 h-34">
+
+        <!-- 下部信息 -->
+        <div class="text-sm text-gray-500" x-text="'积分: ' + selectedUser.credits"></div>
+      </div>
+
+      <!-- 用户信息 -->
+      <div class="flex-1 space-y-3 text-sm text-gray-700">
+        <div class="border p-2">注册时间：<span class="text-black font-semibold" x-text="selectedUser.regdate"></span>
+        </div>
+
+        <div class="flex justify-between border p-2">
+          <span>主题数：<span class="font-semibold" x-text="selectedUser.threads"></span></span>
+          <a href="#" class="text-blue-600 hover:underline" @click="openUserThreads (selectedUser.uid)">查看Ta的主题</a>
+        </div>
+
+        <div class="flex justify-between border p-2">
+          <span>回帖数：<span class="font-semibold" x-text="selectedUser.posts"></span></span>
+          <a href="#" class="text-blue-600 hover:underline"></a>
+        </div>
+
+        <div class="border p-2">个人签名：<span x-text="selectedUser.signature"></span></div>
+      </div>
+    </div>
+
+    <!-- 关闭按钮 -->
+    <div class="mt-4 text-center">
+      <button @click="show = false" class="text-blue-600 border border-blue-600 px-4 py-1 rounded hover:bg-blue-50">
+        关闭
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function userProfile() {
+    return {
+      show:true,
+      uid: Alpine.store("global").uid,
+      selectedUser: {},
+
+      // 获查询
+      fetchUser() {
+        axios.get(`http://192.168.12.113:5050/users?uid=${this.uid}&sort=0&username=`)
+          .then(response => {
+            if (response.data.length > 0) {
+              this.selectedUser = response.data[0]
+
+
+            }
+          })
+          .catch(error => {
+            console.error("Axios Error:", error);
+          })
+          .finally(() => {
+          });
+      },
+      openUserThreads() {
+        this.show=false
+        window.dispatchEvent(new CustomEvent("openUserThreads", { detail: { uid: this.uid } }));
+      },
+      // 初始化方法
+      alpineInit() {
+        this.fetchUser()
+        this.show=true
+      },
+
+    };
+  }
+
+</script>

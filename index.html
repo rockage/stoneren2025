@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>STONEREN-BBS</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Flowbite -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.js"></script>
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        // 禁止双指缩放
+        document.addEventListener('gesturestart', function (event) {
+            event.preventDefault();
+        });
+
+        // 禁止鼠标滚轮缩放
+        document.addEventListener('wheel', function (event) {
+            if (event.ctrlKey) {
+                event.preventDefault();
+            }
+        }, { passive: false });
+
+        // 禁止触摸屏双指缩放
+        document.addEventListener("touchmove", function (event) {
+            if (event.touches.length > 1) {
+                event.preventDefault();
+            }
+        }, { passive: false });
+
+        // 禁止键盘缩放
+        document.addEventListener("keydown", function (event) {
+            if ((event.ctrlKey && (event.key === "+" || event.key === "-")) || event.key === "Escape") {
+                event.preventDefault();
+            }
+        });
+    </script>
+
+</head>
+
+<body class="h-screen flex flex-col bg-gray-100">
+
+    <!-- 顶部 Title -->
+    <header class="bg-blue-600 text-white text-center py-4 text-xl font-bold w-full">
+        Bienvenue sur STONEREN-BBS
+    </header>
+
+    <div x-data="app()" x-init="alpineInit()" class="flex flex-1">
+        <!-- 输入模态框 -->
+        <div x-show="dialog" class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+            <div @click.away="dialog = false"
+                class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md transition-transform transform" x-transition>
+                <!-- 关闭按钮 -->
+                <button @click="dialog = false"
+                    class="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl">&times;</button>
+
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">搜索主题</h2>
+
+                <!-- 输入框 -->
+                <input type="text" placeholder="在这里输入关键字..." x-model="keyword"
+                    class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+
+                <!-- 确认按钮 -->
+                <div class="text-right mt-4">
+                    <button @click="dialog = false; searchthreads()"
+                        class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">确认</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 移动端汉堡菜单按钮 -->
+        <button @click="sidebarOpen = !sidebarOpen"
+            class="fixed z-50 top-2 left-1 md:hidden text-white bg-gray-500 p-0 rounded w-10 h-10 ">
+            ☰
+        </button>
+
+        <!-- 侧边栏 -->
+        <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+            class="fixed md:relative md:w-1/4 w-64 h-full bg-gray-800 text-white flex flex-col items-center py-6 space-y-4 transition-transform md:translate-x-0">
+            <!-- 关闭按钮（移动端） -->
+            <button @click="sidebarOpen = false" class="absolute top-4 right-4 md:hidden text-white">
+                ✖
+            </button>
+
+            <div class="flex items-center w-3/4 my-2">
+                <div class="flex-grow border-t border-gray-500"></div>
+                <span class="px-2 text-gray-400 text-sm">遗址选择</span>
+                <div class="flex-grow border-t border-gray-500"></div>
+            </div>
+            <button @click="loadThreads(0,$store.search.sort); sidebarOpen = false"
+                class="w-32 py-1 text-sm bg-[#1E8449] rounded-lg hover:bg-green-600">
+                全部
+            </button>
+            <button @click="loadThreads(2,$store.search.sort); sidebarOpen = false"
+                class="w-32 py-1 text-sm bg-[#1E8449] rounded-lg hover:bg-green-600">
+                水区
+            </button>
+            <button @click="loadThreads(6,$store.search.sort); sidebarOpen = false"
+                class="w-32 py-1 text-sm bg-[#1E8449] rounded-lg hover:bg-green-600">
+                原创
+            </button>
+            <button @click="loadThreads(3,$store.search.sort); sidebarOpen = false"
+                class="w-32 py-1 text-sm bg-[#1E8449] rounded-lg hover:bg-green-600">
+                转载
+            </button>
+            <button @click="loadThreads(5,$store.search.sort); sidebarOpen = false"
+                class="w-32 py-1 text-sm bg-[#1E8449] rounded-lg hover:bg-green-600">
+                电脑
+            </button>
+            <button @click="loadThreads(4,$store.search.sort); sidebarOpen = false"
+                class="w-32 py-1 text-sm bg-[#1E8449] rounded-lg hover:bg-green-600">
+                音乐
+            </button>
+            <div class="flex items-center w-3/4 my-2">
+                <div class="flex-grow border-t border-gray-500"></div>
+                <span class="px-2 text-gray-400 text-sm">年代排序</span>
+                <div class="flex-grow border-t border-gray-500"></div>
+            </div>
+            <button @click="loadThreads($store.search.fid,1); sidebarOpen = false"
+                class="w-32 py-1 text-sm bg-[#D99100] rounded-lg hover:bg-yellow-600">
+                最新
+            </button>
+
+            <button @click="loadThreads($store.search.fid,0); sidebarOpen = false"
+                class="w-32 py-1 text-sm bg-[#D99100] rounded-lg hover:bg-yellow-600">
+                最旧
+            </button>
+            <div class="flex items-center w-3/4 my-2">
+                <div class="flex-grow border-t border-gray-500"></div>
+                <span class="px-2 text-gray-400 text-sm">考古工具</span>
+                <div class="flex-grow border-t border-gray-500"></div>
+            </div>
+            <button @click="loadUsers(0,0); sidebarOpen = false"
+                class="w-32 py-1 text-sm bg-[#3468C3] rounded-lg hover:bg-blue-600">
+                用户列表
+            </button>
+            <button @click="dialog = true ; sidebarOpen = false"
+                class="w-32 py-1 text-sm bg-[#3468C3] rounded-lg hover:bg-blue-600">
+                主题搜索
+            </button>
+        </aside>
+
+        <!-- 右侧主内容区 main区动态页面绑定conten -->
+        <main class="flex-1 flex flex-col items-center w-full">
+            <div id="content" class="p-6 w-full max-w-screen-md bg-white shadow-md rounded-lg"></div>
+        </main>
+
+    </div>
+
+    <!-- 底部 Footer -->
+    <footer class="bg-gray-700 text-white text-center py-3">
+        2025 &copy; STONEREN.com
+    </footer>
+
+    <script>
+
+        document.addEventListener("alpine:init", () => {
+            Alpine.store("bbs", {
+                threads: [],        // 缓存的主题详情
+                scrollPosition: 0,  // 记录滚动条位置
+                fetchPage: 1        // 页数
+            }),
+                Alpine.store("search", {
+                    fid: 0,      // 0=所有板块 //2水 3转 4音 5计 6原 
+                    sort: 0,     // 0=从旧到新 1=从新到旧
+                    uid: 0,      // 搜索特定用户
+                    keyword: ''
+                }),
+                Alpine.store("post", {
+                    tid: 0,      // 0=所有板块 //2水 3转 4音 5计 6原 
+                }),
+                Alpine.store("user", {
+                    uid: 0,
+                    sort: 0,
+                    username: '',
+                }),
+                Alpine.store('global', { //    全局弹窗：用户详情
+                    cache: {},
+                    uid: 0,
+                    getUserProfile: function () {
+                        const file = 'userProfile.html'
+                        if (this.cache[file]) {
+                            this.insertDIV(this.cache[file])
+                        } else {
+                            fetch(file)
+                                .then(res => res.text())
+                                .then(html => {
+                                    this.cache[file] = html
+                                    this.insertDIV(html)
+                                })
+                        }
+                    },
+                    insertDIV(html) {
+                        //document.getElementById('user-profile-modal')?.remove()
+                        const newDiv = document.createElement('div')
+                        newDiv.id = 'user-profile-modal'
+                        newDiv.innerHTML = html
+                        newDiv.querySelectorAll("script").forEach(oldScript => {
+                            const newScript = document.createElement("script")
+                            newScript.textContent = oldScript.textContent
+                            document.body.appendChild(newScript).parentNode.removeChild(newScript)
+                        })
+                        document.body.appendChild(newDiv)
+                    }
+
+                })
+
+        })
+        function app() {
+            return {
+                sidebarOpen: false,
+                cache: {},
+                keyword: "",
+                dialog: false,
+
+                loadUsers(uid, sort) {
+                    Alpine.store("user").uid = uid
+                    Alpine.store("user").sort = 3 // 默认以主题数排序
+                    Alpine.store("user").username = ''
+                    this.loadContent('users.html')
+                },
+                searchthreads() {
+                    this.purgeThreadsCache()
+                    Alpine.store("search").keyword = this.keyword
+                    this.loadContent('thread.html')
+                },
+                loadThreads(fid, sort) {
+                    this.purgeThreadsCache() // 清空Threads Cache
+
+                    Alpine.store("search").fid = fid // 板块
+
+                    Alpine.store("search").sort = sort // 排序方式
+                    this.loadContent('thread.html') // 默认首页是帖子列表，通过监听事件决定页面呈现
+                },
+                loadPost(tid) {
+                    Alpine.store("post").tid = tid // 主题ID，post模块
+                    this.loadContent('post.html') // 装载主题全部帖子（无排序）
+                },
+
+                loadContent(file, params = {}) {
+
+
+                    /*  构造 URL 参数
+                    let url = file
+                    if (Object.keys(params).length > 0) {
+                        let query = new URLSearchParams(params).toString()
+                        url += "?" + query
+                    }
+
+                    // 改变 URL，但不刷新页面
+                    //history.pushState(null, "", url) //2025.03.27: 弃用pushState模式
+                    */
+
+                    // 加载文件内容
+                    if (this.cache[file]) {
+                        this.insertContent(this.cache[file])
+                    } else {
+                        fetch(file)
+                            .then(res => res.text())
+                            .then(html => {
+                                this.cache[file] = html
+                                this.insertContent(html)
+                            })
+                    }
+                },
+
+                insertContent(html) { // 同时执行动态读取的script，否则只有页面框架，script会被忽略
+                    const contentDiv = document.getElementById("content")
+                    contentDiv.innerHTML = html
+
+                    // 查找并执行 script
+                    contentDiv.querySelectorAll("script").forEach(oldScript => {
+                        const newScript = document.createElement("script")
+                        newScript.textContent = oldScript.textContent
+                        document.body.appendChild(newScript).parentNode.removeChild(newScript)
+                    })
+                },
+                purgeThreadsCache() {
+                    Alpine.store("bbs").threads = []
+                    Alpine.store("bbs").scrollPosition = 0
+                    Alpine.store("bbs").fetchPage = 1
+                    Alpine.store("search").fid = 0
+                    Alpine.store("search").sort = 0
+                    Alpine.store("search").uid = 0
+                    Alpine.store("search").keyword = ""
+                },
+                // 初始化方法
+                alpineInit() {
+
+                    this.loadThreads(0, 0) // 默认首页是帖子列表，通过监听事件决定页面呈现
+
+                    // 事件监听1：加载帖子
+                    window.addEventListener("loadPost", (event) => {
+                        let tid = event.detail.tid;
+                        this.loadPost(tid)
+                    })
+                    // 事件监听2：监听返回主题列表的事件
+                    window.addEventListener("backThread", () => {
+                        this.loadContent("thread.html")
+                        setTimeout(() => {
+                            window.scrollTo(0, Alpine.store("bbs").scrollY) // 复原滚动条
+                        }, 500)
+
+                    })
+                    // 监听事件3:返回某特定用户的全部主题
+                    window.addEventListener("openUserThreads", () => {
+
+                        let uid = event.detail.uid;
+                        this.purgeThreadsCache() // 先清空
+                        Alpine.store("search").uid = uid
+                        this.loadContent("thread.html")
+                    })
+
+                }
+
+            }
+        }
+
+
+    </script>
+
+
+</body>
+
+</html>

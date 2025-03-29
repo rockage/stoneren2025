@@ -1,0 +1,210 @@
+
+
+<body class="bg-gray-100 p-6">
+  <div x-data="userList()" x-init="alpineInit()" class="w-full max-w-screen-md mx-auto bg-white shadow rounded-lg">
+    <!-- 回到顶部按钮 -->
+    <div x-data="{ showTop: false }" x-init="window.addEventListener('scroll', () => { showTop = window.scrollY > 300})"
+      class="fixed bottom-6 right-6 z-50">
+      <button x-show="showTop" x-transition @click="window.scrollTo({ top: 0, behavior: 'smooth' })"
+        class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full shadow-lg text-sm">
+        ⬆ 回到顶部
+      </button>
+    </div>
+
+
+
+    <!-- 输入用户名模态框 -->
+    <div x-show="dialog" class="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
+      <div @click.away="dialog = false"
+        class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md transition-transform transform" x-transition>
+        <!-- 关闭按钮 -->
+        <button @click="dialog = false"
+          class="absolute top-3 right-3 text-gray-400 hover:text-gray-700 text-xl">&times;</button>
+
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">查找用户</h2>
+
+        <!-- 输入框 -->
+        <input type="text" placeholder="在这里输入用户名..." x-model="username"
+          class="w-full border border-gray-300 rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+
+        <!-- 确认按钮 -->
+        <div class="text-right mt-4">
+          <button @click="dialog = false; sortUsers('username')"
+            class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">确认</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 表头 -->
+    <div class="grid grid-cols-4 gap-x-2 font-bold border-b px-6 py-3 text-gray-700 bg-gray-100">
+      <button type="button" @click="dialog = true"
+        class="w-full flex justify-center items-center gap-1 text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-3 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+        用户名
+      </button>
+
+      <button type="button" @click="sortUsers('regdate') "
+        class="w-full flex justify-center items-center gap-1 text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-xs px-3 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+        注册时间
+      </button>
+
+      <button type="button" @click="sortUsers('threads') "
+        class="w-full flex justify-center items-center gap-1 text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-3 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+        主题数
+      </button>
+
+      <button type="button" @click="sortUsers('posts') "
+        class="w-full flex justify-center items-center gap-1 text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-3 py-2 dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800">
+        评论数
+      </button>
+
+      <!-- 可加更多按钮 -->
+    </div>
+    <!-- 用户数据行 -->
+    <template x-for="user in users" :key="user.uid">
+      <div class="grid grid-cols-4 border-b px-6 py-3 text-xs text-[#85878e] items-center" @click="openDetail(user)">
+        <span x-text="user.username" class="font-semibold text-center"></span>
+        <span x-text="user.regdate" class="font-semibold text-center"></span>
+        <span x-text="user.threads" class="font-semibold text-center"></span>
+        <span x-text="user.posts" class="font-semibold text-center"></span>
+      </div>
+    </template>
+
+    <!-- 加载状态 -->
+    <div x-ref="loadMoreTrigger" class="text-center text-gray-400 p-4">
+      <template x-if="loading">
+        <p>加载中...</p>
+      </template>
+      <template x-if="allLoaded">
+        <p>没有更多用户了</p>
+      </template>
+    </div>
+  </div>
+
+  <script>
+    function userList() {
+      return {
+        detail: false,
+        dialog: false,
+        users: [],
+        username: '',
+        page: 1,
+        loading: false,
+        allLoaded: false,
+        sortOrder: '',
+        lazyLoadLocked: false,
+        uid: Alpine.store("user").uid,
+        sort: Alpine.store("user").sort,
+        selectedUser: {},
+        observer: null,
+
+        openDetail(user) {
+          Alpine.store("global").uid=user.uid
+          Alpine.store("global").getUserProfile()
+        },
+        openUserThreads(uid) {
+
+          window.dispatchEvent(new CustomEvent("openUserThreads", { detail: { uid: uid } }));
+        },
+        sortUsers(sortOrder) {
+
+          switch (sortOrder) {
+            case 'regdate':
+              if (this.sort == "1") { this.sort = "2" } else { this.sort = "1" }
+              break
+
+            case 'threads':
+              if (this.sort == "3") { this.sort = "4" } else { this.sort = "3" }
+              break
+
+            case 'posts':
+              if (this.sort == "5") { this.sort = "6" } else { this.sort = "5" }
+              break
+
+            case 'username':
+              this.sort = "7"
+              break
+            default:
+              this.sort == "0"
+
+          }
+          if (this.sort != "7") { this.username = "" } // 以非用户名查询方式
+
+
+
+          this.page = 1
+          this.allLoaded = false
+          this.users = []
+          this.detachObserver()
+
+        },
+
+        fetchUsers() {
+          if (this.loading || this.allLoaded || this.lazyLoadLocked) return
+          this.loading = true
+
+          axios.get(`http://192.168.12.113:5050/users?page=${this.page}&uid=${this.uid}&sort=${this.sort}&username=${this.username}`)
+            .then(res => {
+              if (res.data.length > 0) {
+                this.users.push(...res.data)
+                this.page++
+              } else {
+                this.allLoaded = true
+              }
+            })
+            .catch(() => this.allLoaded = true)
+            .finally(() => {
+              this.loading = false
+              if (document.body.scrollHeight <= window.innerHeight) {
+                this.fetchUsers()
+              }
+            })
+
+        },
+
+        setupObserver() {
+          if (this.observer) this.observer.disconnect()
+          this.observer = new IntersectionObserver(entries => {
+            if (entries[0].isIntersecting) {
+              this.fetchUsers()
+            }
+          }, { rootMargin: "100px" })
+          this.observer.observe(this.$refs.loadMoreTrigger)
+        },
+
+        detachObserver() {
+          if (this.observer) {
+            this.observer.disconnect()
+            this.observer = null
+          }
+        },
+
+        alpineInit() {
+       
+
+
+          this.page = 1
+          this.fetchUsers()
+          this.setupObserver()
+          requestAnimationFrame(() => {
+            const mo = new MutationObserver(() => {
+              if (document.body.scrollHeight <= window.innerHeight && !this.allLoaded) {
+                this.fetchUsers()
+              }
+            })
+            mo.observe(document.querySelector('[x-data]'), { childList: true, subtree: true })
+          })
+          this.$nextTick(() => {
+
+
+            // ✨ 主动补加载：如果页面高度不够，强制触发一次懒加载
+            setTimeout(() => {
+
+              this.setupObserver()
+              this.fetchUsers()
+
+            }, 80)
+          })
+        }
+      }
+    }
+  </script>
